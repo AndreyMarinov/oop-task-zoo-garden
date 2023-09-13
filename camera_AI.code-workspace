@@ -1,8 +1,81 @@
-{
-	"folders": [
-		{
-			"path": "../camera_AI"
-		}
-	],
-	"settings": {}
-}
+import cv2
+import numpy as np
+
+class BlueLedDetector:
+    def __init__(self, min_contour_area=100):
+        self.min_contour_area = min_contour_area
+
+    def capture_and_detect_blue_leds(self):
+        # Initialize the camera
+        cap = cv2.VideoCapture(0)
+
+        if not cap.isOpened():
+            raise Exception("Camera not found or unable to access.")
+
+        try:
+            # Capture a frame from the camera
+            ret, frame = cap.read()
+
+            if not ret:
+                raise Exception("Failed to capture an image from the camera.")
+
+            # Save the captured frame as a file
+            cv2.imwrite("captured_image.jpg", frame)
+
+            # Load the saved image
+            image = cv2.imread("captured_image.jpg")
+
+            # Convert the image to the HSV color space
+            hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+
+            # Define the lower and upper bounds for the blue color in HSV
+            lower_blue = np.array([90, 50, 50])
+            upper_blue = np.array([130, 255, 255])
+
+            # Create a mask to isolate blue color in the image
+            blue_mask = cv2.inRange(hsv_image, lower_blue, upper_blue)
+
+            # Find blue contours in the mask
+            contours, _ = cv2.findContours(blue_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+            # Initialize a list to store valid blue leds
+            valid_blue_leds = []
+
+            # Iterate through contours
+            for contour in contours:
+                contour_area = cv2.contourArea(contour)
+
+                if contour_area > self.min_contour_area:
+                    valid_blue_leds.append(contour)
+                    (x, y), radius = cv2.minEnclosingCircle(contour)
+                    center = (int(x), int(y))
+                    radius = int(radius)
+                    cv2.circle(image, center, radius, (0, 255, 0), 2)  # Green circle around blue dot
+
+            # Count the number of valid blue leds
+            blue_led_count = len(valid_blue_leds)
+
+            if blue_led_count < 8:
+                print("There is a problem with some of the leds.")
+            elif blue_led_count > 8:
+                print("There is a problem with the camera angle or OpenCV capture.")
+            else:
+                print("All leds are working normally.")
+
+            if blue_led_count > 0:
+                print(f"Number of valid blue leds detected: {blue_led_count}")
+
+                # Save the image with circles drawn
+                cv2.imwrite("output_image.jpg", image)
+
+        except Exception as e:
+            print(f"Error: {str(e)}")
+
+        finally:
+            # Release the camera and close any open windows
+            cap.release()
+            cv2.destroyAllWindows()
+
+if __name__ == "__main__":
+    detector = BlueLedDetector(min_contour_area=100)  # You can adjust the min_contour_area here
+    detector.capture_and_detect_blue_leds()
